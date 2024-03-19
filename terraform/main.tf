@@ -16,11 +16,3 @@ module "galleri-ons-data" {
   environment             = var.environment
   account_id              = var.account_id
 }
-
-module "galleri-test-data" {
-  source                  = "./modules/s3"
-  bucket_name             = "galleri-test-data"
-  # galleri_lambda_role_arn = module.iam_galleri_lambda_role.galleri_lambda_role_arn
-  environment             = var.environment
-  account_id              = var.account_id
-}
