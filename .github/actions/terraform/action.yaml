@@ -1,0 +1,130 @@
+name: "Terraform action"
+description: "Build infrastructure"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Git checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ env.invitations-branch }}
+        path: "Galleri-Invitations"
+
+    - name: Checkout frontend
+      uses: actions/checkout@v4
+      with:
+        path: "Galleri-Frontend"
+        repository: NHSDigital/Galleri-Frontend
+        ref: ${{ env.frontend-branch }}
+
+    - name: Configure AWS credentials from AWS account
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        role-to-assume: ${{ env.role-to-assume }}
+        aws-region: ${{ env.aws-region }}
+        role-session-name: GitHub-OIDC-TERRAFORM
+
+    - name: Derive environment-type
+      id: environment-type
+      shell: bash
+      run: |
+        echo "environment-type=$(echo '${{ env.environment }}' | cut -f1 -d'-')" >> $GITHUB_OUTPUT
+
+    - name: setup variables for nextjs
+      shell: bash
+      run: |
+        apis=$(aws apigateway get-rest-apis)
+        while read -r id name; do
+            if [[ $name == ${{ env.environment }}-* ]]; then
+                env_name=$(echo "$name" | sed 's/^${{ env.environment }}-//' | tr '[:lower:]-' '[:upper:]_')
+                export "NEXT_PUBLIC_$env_name=$id"
+                echo "API ID: NEXT_PUBLIC_$env_name=\"$id\""
+            fi
+        done < <(echo "$apis" | jq -r '.items[] | "\(.id) \(.name)"')
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+
+    - name: Terraform fmt
+      id: fmt
+      shell: bash
+      run: |
+        cd ./terraform
+        terraform fmt -check
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      shell: bash
+      run: |
+        cd ./terraform
+        terraform init -backend-config="bucket=${{ env.aws-bucket-name }}" -backend-config="key=${{ env.aws-bucket-key-name }}" -backend-config="region=${{ env.aws-region }}"
+
+    - name: Terraform workspace
+      id: workspace
+      shell: bash
+      run: |
+        # Prevent step failing on exit code != 0
+        set +e
+        cd ./terraform
+        if [ "${{ env.environment }}" != "dev" ]; then
+          terraform workspace select ${{ env.environment }}
+          if [ $? != 0 ]; then
+            terraform workspace new ${{ env.environment }}
+            terraform workspace select ${{ env.environment }}
+          fi
+        fi
+
+    - name: Terraform Validate
+      id: validate
+      shell: bash
+      run: |
+        cd ./terraform
+        terraform validate -no-color
+
+    - name: Terraform Plan
+      id: plan
+      shell: bash
+      run: |
+        cd ./terraform
+        terraform plan -no-color -var-file=environment/${{ steps.environment-type.outputs.environment-type }}/${{ env.environment }}.tfvars
+
+    - name: Terraform Plan Status
+      if: steps.plan.outcome == 'failure'
+      shell: bash
+      run: |
+        echo Terraform Plan Status has failed
+        exit 1
+
+    - name: Terraform ${{ env.tf-action }}
+      shell: bash
+      run: |
+        cd ./terraform
+        npm install --prefix src/dataFilterLambda
+        npm install --prefix src/lsoaLoaderLambda
+        npm install --prefix src/clinicIcbListLambda
+        npm install --prefix src/clinicInformationLambda
+        npm install --prefix src/clinicSummaryListLambda
+        npm install --prefix src/invitationParametersLambda
+        npm install --prefix src/invitationParametersPutForecastUptakeLambda
+        npm install --prefix src/invitationParametersPutQuintilesLambda
+        npm install --prefix src/participatingIcbListLambda
+        npm install --prefix src/targetFillToPercentageLambda
+        npm install --prefix src/targetFillToPercentagePutLambda
+        npm install --prefix src/getLsoaInRangeLambda
+        npm install --prefix src/getLsoaParticipantsLambda
+        npm install --prefix src/calculateNumberToInviteLambda
+        npm install --prefix src/generateInvitesTriggerLambda
+        npm install --prefix src/gpPracticesLoaderLambda
+        npm install --prefix src/userAccountsLambda
+        npm install --prefix src/pollMeshMailboxLambda
+        npm install --prefix src/validateCaasFeedLambda
+        npm install --prefix src/caasFeedAddRecordsLambda
+        npm install --prefix src/caasFeedUpdateRecordsLambda
+        npm install --prefix src/createInvitationBatchLambda
+        npm install --prefix src/gtmsMeshMailboxLambda
+        npm install --prefix src/validateClinicDataLambda
+        npm install --prefix src/gtmsUploadClinicDataLambda
+        terraform ${{ env.tf-action }} -auto-approve -input=false -var-file=environment/${{ steps.environment-type.outputs.environment-type }}/${{ env.environment }}.tfvars

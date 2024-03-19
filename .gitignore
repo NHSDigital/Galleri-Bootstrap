@@ -1,0 +1,58 @@
+.scannerwork
+*cloc-report*.json
+*sbom-report*.json
+*vulnerabilities-report*.json
+
+*.code-workspace
+!project.code-workspace
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Ignore override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Include override files you do wish to add to version control using negated pattern
+# !example_override.tf
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+# example: *tfplan*
+
+# Ignore CLI configuration files
+.terraform*
+.terraformrc
+terraform.rc
+
+# python directories
+**/__pycache__
+venv
+
+# node modules
+node_modules
+
+# remove zip files from lambdas
+*.zip
+
+# local data
+local_data
+
+# remove local data files
+nonprod-postcode-load
+nonprod-unique-lsoa-data
+nonprod-population-data
+participating_icb.json
+Participating_ICBs.csv
+
+coverage
