@@ -104,7 +104,8 @@ aws iam create-policy --policy-name IAMCreateRoleCustom --policy-document \
                 "iam:ListAttachedRolePolicies",
                 "iam:ListInstanceProfilesForRole",
                 "iam:DeleteRole",
-                "iam:*"
+                "iam:*",
+                "acm:DeleteCertificate"
             ],
             "Resource": [
                 "*"
